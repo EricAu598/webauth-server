@@ -267,7 +267,7 @@
             const password = document.getElementById('registerPassword').value;
             
             try {
-                const response = await fetch('http://localhost:3000/api/register', {
+                const response = await fetch('http://107.173.3.55:3000/api/register', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -296,7 +296,7 @@
             const password = document.getElementById('loginPassword').value;
             
             try {
-                const response = await fetch('http://localhost:3000/api/login', {
+                const response = await fetch('http://107.173.3.55:3000/api/login', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -336,7 +336,7 @@
             
             try {
                 // Step 1: Get registration options from server
-                const optionsResponse = await fetch('http://localhost:3000/api/fido/register', {
+                const optionsResponse = await fetch('http://107.173.3.55:3000/api/fido/register', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -374,7 +374,7 @@
                 };
                 
                 // Step 4: Send credential to server for verification
-                const verifyResponse = await fetch('http://localhost:3000/api/fido/register/verify', {
+                const verifyResponse = await fetch('http://107.173.3.55:3000/api/fido/register/verify', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -412,7 +412,7 @@
             
             try {
                 // Step 1: Get authentication options from server
-                const optionsResponse = await fetch('http://localhost:3000/api/fido/authenticate', {
+                const optionsResponse = await fetch('http://107.173.3.55:3000/api/fido/authenticate', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -457,7 +457,7 @@
                 };
                 
                 // Step 4: Send assertion to server for verification
-                const verifyResponse = await fetch('http://localhost:3000/api/fido/authenticate/verify', {
+                const verifyResponse = await fetch('http://107.173.3.55:3000/api/fido/authenticate/verify', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'

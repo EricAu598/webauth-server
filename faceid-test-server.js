@@ -31,7 +31,7 @@ const redis = new Redis({
 
 // Middleware
 app.use(cors({
-  origin: ['null', 'file://', 'http://localhost:3000'],
+  origin: ['null', 'file://', 'http://localhost:3000','https://webauth-server.vercel.app/'],
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   credentials: true
 }));

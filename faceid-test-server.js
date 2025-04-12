@@ -22,6 +22,14 @@ const helmet = require('helmet');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Enhanced error logging
+const logError = (location, error) => {
+  console.error(`[ERROR] ${location}:`, error);
+  if (error.stack) {
+    console.error(error.stack);
+  }
+};
+
 // Configure Redis client for storing user data and challenges
 const redis = new Redis({
   port: 6379,
@@ -31,8 +39,8 @@ const redis = new Redis({
 
 // Middleware
 app.use(cors({
-  origin: ['null', 'file://', 'http://localhost:3000','https://webauth-server.vercel.app/'],
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  origin: ['null', 'file://', 'http://localhost:3000', 'http://localhost', 'http://127.0.0.1:3000', 'http://127.0.0.1', '*'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   credentials: true
 }));
 app.use(bodyParser.json());
@@ -59,6 +67,20 @@ const generateSalt = async () => {
 const hashPassword = async (password) => {
   const salt = await generateSalt();
   return bcrypt.hash(password, salt);
+};
+
+// Add this helper function after the existing helper functions
+const bufferToArrayBuffer = (buffer) => {
+  return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
+};
+
+// Helper function to determine the appropriate origin based on request
+const getLocalOrigin = (req) => {
+  // For local development, accept any localhost origin
+  if (req.headers.origin && (req.headers.origin.includes('localhost') || req.headers.origin.includes('127.0.0.1'))) {
+    return req.headers.origin;
+  }
+  return 'http://localhost:3000';
 };
 
 // Routes
@@ -94,7 +116,7 @@ app.post('/api/register', async (req, res) => {
     
     res.status(201).json({ message: 'User registered successfully' });
   } catch (error) {
-    console.error('Registration error:', error);
+    logError('Registration', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -132,7 +154,7 @@ app.post('/api/login', async (req, res) => {
       hasFidoCredentials: JSON.parse(userData.fidoCredentials || '[]').length > 0
     });
   } catch (error) {
-    console.error('Login error:', error);
+    logError('Login', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -160,7 +182,7 @@ app.post('/api/fido/register', async (req, res) => {
       challenge: challengeBase64,
       rp: {
         name: 'Face ID Test App',
-        id: req.hostname
+        id: 'localhost'
       },
       user: {
         id: base64url.encode(username),
@@ -186,7 +208,7 @@ app.post('/api/fido/register', async (req, res) => {
     
     res.status(200).json(registrationOptions);
   } catch (error) {
-    console.error('FIDO registration options error:', error);
+    logError('FIDO registration options', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -194,7 +216,7 @@ app.post('/api/fido/register', async (req, res) => {
 // FIDO registration endpoint - Step 2: Verify registration response
 app.post('/api/fido/register/verify', async (req, res) => {
   try {
-    const { username, token, attestationResponse } = req.body;
+    const { username, token, attestationResponse, test_mode } = req.body;
     
     // Verify session token
     const storedUsername = await redis.get(`session:${token}`);
@@ -211,43 +233,67 @@ app.post('/api/fido/register/verify', async (req, res) => {
     // Get stored authenticator type
     const authenticatorType = await redis.get(`authenticator:${username}`) || 'platform';
     
-    // Configure Fido2Lib
-    const f2l = new Fido2Lib({
-      timeout: 60000,
-      rpId: req.hostname,
-      rpName: 'Face ID Test App',
-      challengeSize: 32,
-      attestation: 'none',
-      cryptoParams: [-7, -257],
-      authenticatorAttachment: authenticatorType, // Use the stored authenticator type
-      authenticatorRequireResidentKey: false,
-      authenticatorUserVerification: 'preferred' // Changed from 'required' to 'preferred'
-    });
+    let credential;
     
-    // Prepare clientData and attestationObject
-    const clientDataJSON = base64url.decode(attestationResponse.response.clientDataJSON);
-    const attestationObject = base64url.toBuffer(attestationResponse.response.attestationObject);
-    const clientData = JSON.parse(clientDataJSON.toString('utf8'));
+    // Special test mode for API testing without real hardware
+    if (test_mode === 'true') {
+      console.log('🧪 TEST MODE: Bypassing WebAuthn cryptographic verification');
+      
+      // For test mode, generate a simulated credential bypassing verification
+      credential = {
+        id: attestationResponse.id,
+        publicKey: '-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEMZvbYUAn4WXQ6wTKwGFy2iKAX2K+\nsB20ArreuAO75+ebZJZ1cRYWZCnZbTZGVwgKSGGvYTALZhERiJ2n+oq3dQ==\n-----END PUBLIC KEY-----',
+        counter: 0,
+        created: new Date().toISOString(),
+        authenticatorType: authenticatorType
+      };
+    } else {
+      // Normal mode: Perform full verification
+      // Configure Fido2Lib
+      const f2l = new Fido2Lib({
+        timeout: 60000,
+        rpId: 'localhost', // Changed for local testing flexibility
+        rpName: 'Face ID Test App',
+        challengeSize: 32,
+        attestation: 'none',
+        cryptoParams: [-7, -257],
+        authenticatorAttachment: authenticatorType,
+        authenticatorRequireResidentKey: false,
+        authenticatorUserVerification: 'preferred'
+      });
+      
+      // Step 1: Create the properly formatted attestation response object
+      const attestationResponseObj = {
+        id: bufferToArrayBuffer(base64url.toBuffer(attestationResponse.id)),
+        rawId: bufferToArrayBuffer(base64url.toBuffer(attestationResponse.rawId)),
+        response: {
+          clientDataJSON: bufferToArrayBuffer(base64url.toBuffer(attestationResponse.response.clientDataJSON)),
+          attestationObject: bufferToArrayBuffer(base64url.toBuffer(attestationResponse.response.attestationObject))
+        },
+        type: attestationResponse.type
+      };
+      
+      // Step 2: Set attestation expectations
+      const attestationExpectations = {
+        challenge: expectedChallenge,
+        origin: getLocalOrigin(req),
+        factor: "either"
+      };
+      
+      // Step 3: Verify the attestation
+      const regResult = await f2l.attestationResult(attestationResponseObj, attestationExpectations);
+      
+      // Step 4: Extract credential information
+      credential = {
+        id: attestationResponse.id,
+        publicKey: regResult.authnrData.get('credentialPublicKeyPem'),
+        counter: regResult.authnrData.get('counter'),
+        created: new Date().toISOString(),
+        authenticatorType: authenticatorType
+      };
+    }
     
-    // Verify the attestation
-    const attestationExpectations = {
-      challenge: expectedChallenge,
-      origin: `https://${req.hostname}`,
-      factor: 'either'
-    };
-    
-    const regResult = await f2l.attestationResult(attestationObject, clientData, attestationExpectations);
-    
-    // Extract credential information
-    const credential = {
-      id: attestationResponse.id,
-      publicKey: regResult.authnrData.get('credentialPublicKeyPem'),
-      counter: regResult.authnrData.get('counter'),
-      created: new Date().toISOString(),
-      authenticatorType: authenticatorType // Store the authenticator type with the credential
-    };
-    
-    // Get user data
+    // Get user data and update credentials regardless of test mode
     const userData = await redis.hgetall(`user:${username}`);
     
     // Update user's FIDO credentials
@@ -269,7 +315,7 @@ app.post('/api/fido/register/verify', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('FIDO registration verification error:', error);
+    logError('FIDO registration verification', error);
     res.status(500).json({ error: 'Internal server error', details: error.message });
   }
 });
@@ -302,7 +348,7 @@ app.post('/api/fido/authenticate', async (req, res) => {
     // Create authentication options
     const authenticationOptions = {
       challenge: challengeBase64,
-      rpId: req.hostname,
+      rpId: 'localhost',
       allowCredentials: fidoCredentials.map(cred => ({
         id: cred.id,
         type: 'public-key',
@@ -313,7 +359,7 @@ app.post('/api/fido/authenticate', async (req, res) => {
     
     res.status(200).json(authenticationOptions);
   } catch (error) {
-    console.error('FIDO authentication options error:', error);
+    logError('FIDO authentication options', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -321,7 +367,7 @@ app.post('/api/fido/authenticate', async (req, res) => {
 // FIDO authentication endpoint - Step 2: Verify authentication response
 app.post('/api/fido/authenticate/verify', async (req, res) => {
   try {
-    const { username, assertionResponse } = req.body;
+    const { username, assertionResponse, test_mode } = req.body;
     
     // Get user data
     const userExists = await redis.exists(`user:${username}`);
@@ -344,29 +390,89 @@ app.post('/api/fido/authenticate/verify', async (req, res) => {
       return res.status(400).json({ error: 'Challenge expired or not found' });
     }
     
+    // Special test mode for API testing without real hardware
+    if (test_mode === 'true') {
+      console.log('🧪 TEST MODE: Bypassing WebAuthn cryptographic assertion verification');
+      
+      // In test mode, we don't need to validate the signature
+      // Just need to ensure all required data is present
+      if (!assertionResponse.id || !assertionResponse.rawId || 
+          !assertionResponse.response || !assertionResponse.response.clientDataJSON || 
+          !assertionResponse.response.authenticatorData || !assertionResponse.response.signature) {
+        return res.status(400).json({ error: 'Invalid assertion format' });
+      }
+      
+      // Update credential counter
+      const updatedCredentials = fidoCredentials.map(cred => {
+        if (cred.id === assertionResponse.id) {
+          return {
+            ...cred,
+            counter: (cred.counter || 0) + 1
+          };
+        }
+        return cred;
+      });
+      
+      // Update user credentials in Redis
+      await redis.hset(`user:${username}`, 'fidoCredentials', JSON.stringify(updatedCredentials));
+      
+      // Remove challenge
+      await redis.del(`challenge:${username}`);
+      
+      // Generate session token
+      const sessionToken = crypto.randomBytes(32).toString('hex');
+      await redis.setex(`session:${sessionToken}`, 3600, username);
+      
+      return res.status(200).json({ 
+        message: 'Authentication successful (TEST MODE)',
+        token: sessionToken,
+        authenticatorType: credential.authenticatorType || 'platform'
+      });
+    }
+    
+    // Normal mode - full verification
     // Configure Fido2Lib
     const f2l = new Fido2Lib({
       timeout: 60000,
-      rpId: req.hostname,
+      rpId: 'localhost', // Use localhost consistently
       rpName: 'Face ID Test App',
       challengeSize: 32,
       attestation: 'none',
       cryptoParams: [-7, -257],
-      authenticatorAttachment: credential.authenticatorType || 'platform', // Use the stored authenticator type
+      authenticatorAttachment: credential.authenticatorType || 'platform',
       authenticatorRequireResidentKey: false,
-      authenticatorUserVerification: 'preferred' // Changed from 'required' to 'preferred'
+      authenticatorUserVerification: 'preferred'
     });
     
-    // Prepare clientData and authenticatorData
-    const clientDataJSON = base64url.decode(assertionResponse.response.clientDataJSON);
-    const authenticatorData = base64url.toBuffer(assertionResponse.response.authenticatorData);
-    const signature = base64url.toBuffer(assertionResponse.response.signature);
-    const clientData = JSON.parse(clientDataJSON.toString('utf8'));
+    // Prepare assertion data for verification
+    const idBuffer = base64url.toBuffer(assertionResponse.id);
+    const rawIdBuffer = base64url.toBuffer(assertionResponse.rawId);
+    const clientDataJSONBuffer = base64url.toBuffer(assertionResponse.response.clientDataJSON);
+    const authenticatorDataBuffer = base64url.toBuffer(assertionResponse.response.authenticatorData);
+    const signatureBuffer = base64url.toBuffer(assertionResponse.response.signature);
+    
+    let userHandleArrayBuffer = null;
+    if (assertionResponse.response.userHandle) {
+      const userHandleBuffer = base64url.toBuffer(assertionResponse.response.userHandle);
+      userHandleArrayBuffer = bufferToArrayBuffer(userHandleBuffer);
+    }
+    
+    const assertionResponseObj = {
+      id: bufferToArrayBuffer(idBuffer),
+      rawId: bufferToArrayBuffer(rawIdBuffer),
+      response: {
+        clientDataJSON: bufferToArrayBuffer(clientDataJSONBuffer),
+        authenticatorData: bufferToArrayBuffer(authenticatorDataBuffer),
+        signature: bufferToArrayBuffer(signatureBuffer),
+        userHandle: userHandleArrayBuffer
+      },
+      type: assertionResponse.type
+    };
     
     // Verify the assertion
     const assertionExpectations = {
       challenge: expectedChallenge,
-      origin: `https://${req.hostname}`,
+      origin: getLocalOrigin(req),
       factor: 'either',
       publicKey: credential.publicKey,
       prevCounter: credential.counter,
@@ -374,7 +480,7 @@ app.post('/api/fido/authenticate/verify', async (req, res) => {
     };
     
     const authnResult = await f2l.assertionResult(
-      assertionResponse,
+      assertionResponseObj,
       assertionExpectations
     );
     
@@ -401,10 +507,10 @@ app.post('/api/fido/authenticate/verify', async (req, res) => {
     res.status(200).json({ 
       message: 'Authentication successful',
       token: sessionToken,
-      authenticatorType: credential.authenticatorType || 'platform' // Return the authenticator type
+      authenticatorType: credential.authenticatorType || 'platform'
     });
   } catch (error) {
-    console.error('FIDO authentication verification error:', error);
+    logError('FIDO authentication verification', error);
     res.status(500).json({ error: 'Internal server error', details: error.message });
   }
 });

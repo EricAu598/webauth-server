@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0, minimum-scale=1.0">
+  <title>通行密鑰登入</title>
+  <script>
+    // Initialize ENV_CONFIG from localStorage
+    window.ENV_CONFIG = {
+      BASE_URL: localStorage.getItem('NEXT_PUBLIC_BASE_URL') || '',
+      WHITE_LOGO: localStorage.getItem('NEXT_PUBLIC_WHITE_LOGO') || ''
+    };
+  </script>
+  <style>
+    html,
+    body {
+      height: 100%;
+      width: 100%;
+      margin: 0;
+      padding: 0;
+      background-color: #000000;
+      overflow: hidden;
+      -webkit-text-size-adjust: 100%;
+      -ms-text-size-adjust: 100%;
+    }
+
+    body {
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      -khtml-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+      touch-action: manipulation;
+      color: #ffffff;
+      font-family: Arial, sans-serif;
+      min-height: 100vh;
+      box-sizing: border-box;
+      animation: fadeIn 1s ease-in-out;
+    }
+
+    .container {
+      text-align: center;
+      background-color: #02262D;
+      padding: 30px;
+      border-radius: 15px;
+      border: 1.68px solid #00A8BE;
+      box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+      animation: slideIn 0.48s cubic-bezier(0.32, 0.8, 0.28, 1);
+      width: 97%;
+      max-width: 500px;
+      box-sizing: border-box;
+      margin-top: 30px;
+      position: relative;
+    }
+
+    .exit-button {
+      position: absolute;
+      top: 30px;
+      right: 28px;
+      color: rgb(255, 255, 255);
+      font-size: 16px;
+      text-decoration: none;
+      cursor: pointer;
+    }
+
+    .logo {
+      width: 180px;
+      margin-bottom: 15px;
+    }
+
+    /* Updated .input-field class */
+    .input-field {
+      margin: 0 0 15px;
+      padding: 12px;
+      border: 1px solid rgba(0, 164, 186, 1);
+      border-radius: 68px;
+      font-size: 14px;
+      width: 100%;
+      max-width: 400px;
+      background-color: #000000;
+      /* Black background */
+      color: #ffffff;
+      /* White text */
+      font-family: 'Roboto Mono', monospace;
+      box-sizing: border-box;
+    }
+
+    /* Optional: Update placeholder text color */
+    .input-field::placeholder {
+      color: #888888;
+      /* Gray color for better visibility */
+      opacity: 1;
+      /* Ensure the color is applied */
+    }
+
+    /* Updated .verification-input class */
+    .verification-input {
+      width: 40px;
+      height: 50px;
+      text-align: center;
+      font-size: 24px;
+      border: 1px solid rgba(0, 164, 186, 1);
+      border-radius: 8px;
+      background-color: #000000;
+      /* Black background */
+      color: #ffffff;
+      /* White text */
+      font-family: 'Roboto Mono', monospace;
+      box-sizing: border-box;
+      transition: border-color 0.3s;
+    }
+
+    /* Optional: Update placeholder text color for verification inputs */
+    .verification-input::placeholder {
+      color: #888888;
+      /* Gray color for better visibility */
+      opacity: 1;
+      /* Ensure the color is applied */
+    }
+
+    .button {
+      background-color: rgb(1, 93, 121);
+      color: #ffffff;
+      border: none;
+      padding: 12px;
+      margin-top: 15px;
+      border: 1px solid rgba(0, 225, 255, 1);
+      border-radius: 12px;
+      font-family: 'Roboto Mono', monospace;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 800;
+      transition: background-color 0.3s ease;
+      box-sizing: border-box;
+      gap: 5px;
+      width: 100%;
+      max-width: 400px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .button:hover {
+      background-color: #013646ff;
+    }
+
+    h1,
+    h2 {
+      margin: 10px 0;
+      font-weight: 550;
+    }
+
+    h1 {
+      font-size: 26px;
+    }
+
+    h2 {
+      font-size: 20px;
+      margin: 30px 0px 15px;
+      font-weight: 300;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .log {
+      background-color: #001A26;
+      border-radius: 5px;
+      padding: 10px;
+      max-height: 100px;
+      overflow-y: auto;
+      margin-top: 10px;
+      width: 100%;
+      text-align: left;
+      scrollbar-width: none;
+    }
+
+    .log::-webkit-scrollbar {
+      display: none;
+    }
+
+    .log p {
+      margin: 5px 0;
+    }
+
+    .notify {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: rgba(12, 44, 67, 0.8);
+      color: #ffffff;
+      padding: 10px 20px;
+      border-radius: 5px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+      animation: fadeInOut 2s ease-in-out;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+      }
+
+      to {
+        opacity: 1;
+      }
+    }
+
+    @keyframes slideIn {
+      0% {
+        transform: translateY(100vh);
+        opacity: 0;
+      }
+
+      100% {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+
+    @keyframes fadeInOut {
+      0% {
+        opacity: 0;
+      }
+
+      10% {
+        opacity: 1;
+      }
+
+      90% {
+        opacity: 1;
+      }
+
+      100% {
+        opacity: 0;
+      }
+    }
+
+    .step-one-content {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      /* Align content to the left */
+      gap: 15px;
+      padding-left: 10px;
+    }
+
+    .step-one-content .feature {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      max-width: 400px;
+      text-align: left;
+    }
+
+    /* Adjusted CSS to target img elements */
+    .step-one-content .feature img {
+      width: 24px;
+      height: 24px;
+    }
+
+    .continue-button {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+    }
+
+    .continue-button svg {
+      width: 16px;
+      height: 16px;
+      fill: #ffffff;
+      transition: transform 0.3s ease;
+    }
+
+    .continue-button:hover svg {
+      transform: translateY(2px);
+    }
+
+    /* New CSS for Passkey SVG */
+    .passkey-svg {
+      width: 50px;
+      /* Adjust size as needed */
+      height: 50px;
+      margin-bottom: 1px;
+      /* Space between SVG and heading */
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <a href="${window.ENV_CONFIG.BASE_URL}/home" class="exit-button" id="exitButton">退出</a>
+    <img src="https://rfq-mw-card.s3.ap-northeast-3.amazonaws.com/SPIDERLOGO.png" alt="Milways Logo" class="logo">
+
+    <!-- Step One: Introduction -->
+    <div id="registration-step-1">
+      <!-- Updated Passkey SVG Source -->
+      <img src="https://rfq-mw-card.s3.ap-northeast-3.amazonaws.com/passkey.svg" alt="Passkey Icon" class="passkey-svg">
+
+      <h1>通行密鑰</h1>
+      <div class="step-one-content">
+        <div class="feature">
+          <img src="https://rfq-mw-card.s3.ap-northeast-3.amazonaws.com/shield.svg" alt="Icon 1">
+          <span>建立通行密鑰，下次登入更輕鬆你可透過通行密鑰輕鬆安全地重新登入帳戶。</span>
+        </div>
+        <div class="feature">
+          <img src="https://rfq-mw-card.s3.ap-northeast-3.amazonaws.com/faceid.svg" alt="Icon 2">
+          <span>透過指紋、面孔或螢幕鎖定密碼使用通行密鑰。</span>
+        </div>
+        <div class="feature">
+          <img src="https://rfq-mw-card.s3.ap-northeast-3.amazonaws.com/device.svg" alt="Icon 3">
+          <span>你的通行密鑰會安全儲存於密碼管理工具中。</span>
+        </div>
+      </div>
+      <button id="continueButton" class="button continue-button">
+        <span>繼續</span>
+
+      </button>
+    </div>
+
+    <!-- Step Two: Registration Form -->
+    <div id="registration-step-2" class="hidden">
+      <h1>通行密鑰登入</h1>
+      <form id="registerForm" autocomplete="off">
+        <input type="text" id="username" class="input-field" placeholder="Username" required autocomplete="username">
+        <!-- Modified Password Input: Enable Suggestions for Existing Passwords -->
+        <input type="password" id="password" class="input-field" placeholder="Password" required
+          autocomplete="current-password">
+        <!-- Modified 2FA Input: Numeric Keyboard -->
+        <input type="text" id="twoFACode" class="input-field" placeholder="2FA Code (if applicable)" inputmode="numeric"
+          pattern="\d*" autocomplete="one-time-code">
+        <button id="registerButton" class="button">
+          <!-- Register SVG remains unchanged -->
+          <svg xmlns="http://www.w3.org/2000/svg" height="15" width="15" viewBox="0 0 30 30">
+            <style>
+              .cls-1 {
+                fill: none;
+              }
+            </style>
+            <g fill="#ffffff" stroke="none">
+              <path
+                d="M12.78,25.35H7.1V21.5a.87.87,0,0,0-1-1H1.72V6.36H16.47V17.14l2.47.93.49.19,2.17.82q0-7.65,0-15.29c0-.45,0-.9,0-1.34a1.3,1.3,0,0,0-.17-.58.87.87,0,0,0-.84-.36c-5.49,0-11,0-16.49,0a.93.93,0,0,0-1,1V4.63H1a.87.87,0,0,0-1,1V21.3A.9.9,0,0,0,.29,22c1.68,1.6,3.34,3.24,5.16,4.68a1.65,1.65,0,0,0,1.12.39h6.54Z" />
+              <rect x="4.35" y="8.52" width="9.49" height="1.75" rx="0.88" />
+              <rect x="4.35" y="12.63" width="9.49" height="1.75" rx="0.88" />
+              <rect x="4.35" y="16.73" width="6.87" height="1.75" rx="0.88" />
+              <path
+                d="M17.54,24.75l-.58.84c-.54.79-1.09,1.57-1.63,2.35l0,0c0,.06-.09.1-.16.07a.24.24,0,0,1-.13-.13c0-.18-.07-.37-.11-.56-.24-1.28-.49-2.56-.73-3.84s-.47-2.49-.71-3.74c-.11-.55-.21-1.1-.32-1.66a.13.13,0,0,0,0-.06c0-.19.09-.28.27-.21l5.41,2.05,3.93,1.49a.32.32,0,0,1,.13.1c.05.09,0,.17-.11.22l-1.5.68-2,.89-.09.05.07.08q1.53,1.7,3.05,3.41c.1.11.09.17,0,.27l-1.58,1.34c-.1.09-.18.08-.27,0l-.62-.79-2.2-2.8Z" />
+            </g>
+          </svg>
+          <p>註冊</p>
+        </button>
+      </form>
+    </div>
+
+    <!-- Step Three: Verification Code -->
+    <div id="registration-step-3" class="hidden">
+      <h1>驗證你的帳戶</h1>
+      <p>請輸入寄送到您信箱的驗證碼。</p>
+      <form id="verificationForm">
+        <div class="verification-input-container" id="verificationInputs">
+          <!-- Modified Verification Inputs: Numeric Keyboard -->
+          <input type="text" maxlength="1" class="verification-input" id="code-1" required inputmode="numeric"
+            pattern="\d*">
+          <input type="text" maxlength="1" class="verification-input" id="code-2" required inputmode="numeric"
+            pattern="\d*">
+          <input type="text" maxlength="1" class="verification-input" id="code-3" required inputmode="numeric"
+            pattern="\d*">
+          <input type="text" maxlength="1" class="verification-input" id="code-4" required inputmode="numeric"
+            pattern="\d*">
+          <input type="text" maxlength="1" class="verification-input" id="code-5" required inputmode="numeric"
+            pattern="\d*">
+          <input type="text" maxlength="1" class="verification-input" id="code-6" required inputmode="numeric"
+            pattern="\d*">
+        </div>
+        <button id="verifyButton" class="button" disabled>
+          驗證
+        </button>
+      </form>
+    </div>
+
+    <div class="log hidden" id="log"></div>
+  </div>
+
+  <div id="notify" class="notify hidden"></div>
+
+  <script>
+    document.getElementById('logo-img').src = window.ENV_CONFIG.WHITE_LOGO;
+    
+    document.getElementById('exitButton').addEventListener('click', (e) => {
+      e.preventDefault();
+      const baseUrl = localStorage.getItem('NEXT_PUBLIC_BASE_URL');
+      window.location.href = baseUrl ? `${baseUrl}/home` : '/defaultPage';
+    });
+
+    // Initialize baseUrl from localStorage
+    const baseUrl = localStorage.getItem('NEXT_PUBLIC_BASE_URL');
+    if (!baseUrl) {
+      console.error('Base URL not found in localStorage');
+      showNotification('Configuration error: Base URL not found');
+    }
+    let registrationOptions;
+    let registeredUsername;
+
+    // Existing JavaScript remains unchanged
+    // ... (Your existing JavaScript code)
+
+    // Utility Functions
+    function showLog(message) {
+      const log = document.getElementById('log');
+      const logEntry = document.createElement('pre');
+      logEntry.textContent = message;
+      log.appendChild(logEntry);
+      log.scrollTop = log.scrollHeight;
+    }
+
+    function showNotification(message) {
+      const notify = document.getElementById('notify');
+      notify.textContent = message;
+      notify.classList.remove('hidden');
+      setTimeout(() => {
+        notify.classList.add('hidden');
+      }, 4000);
+    }
+
+    async function pemToArrayBuffer(pem) {
+      const base64 = pem.replace(/-----[^\n]+-----|\n/g, '');
+      const binaryString = atob(base64);
+      const len = binaryString.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      return bytes.buffer;
+    }
+
+    async function encryptData(publicKey, data) {
+      const encoder = new TextEncoder();
+      const encodedData = encoder.encode(data);
+
+      const importedKey = await window.crypto.subtle.importKey(
+        'spki',
+        publicKey, {
+        name: 'RSA-OAEP',
+        hash: {
+          name: 'SHA-256'
+        }
+      },
+        true,
+        ['encrypt']
+      );
+
+      const encryptedData = await window.crypto.subtle.encrypt({
+        name: 'RSA-OAEP'
+      },
+        importedKey,
+        encodedData
+      );
+
+      return btoa(String.fromCharCode(...new Uint8Array(encryptedData)));
+    }
+
+    function base64Encode(str) {
+      return btoa(str);
+    }
+
+    function base64Decode(str) {
+      return atob(str);
+    }
+
+    function arrayBufferToBase64(buffer) {
+      const binary = String.fromCharCode.apply(null, new Uint8Array(buffer));
+      return window.btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+    }
+
+    function bufferToBase64(bufferObj) {
+      if (bufferObj && bufferObj.type === 'Buffer' && Array.isArray(bufferObj.data)) {
+        return btoa(String.fromCharCode.apply(null, new Uint8Array(bufferObj.data)))
+          .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+      }
+      throw new Error('Invalid Buffer object');
+    }
+
+    function base64ToUint8Array(input) {
+      let base64;
+      if (typeof input === 'string') {
+        base64 = input;
+      } else if (input && input.type === 'Buffer' && Array.isArray(input.data)) {
+        base64 = bufferToBase64(input);
+      } else {
+        console.error('Input is neither a string nor a Buffer:', input);
+        throw new Error('Invalid input: expected a string or Buffer object');
+      }
+
+      base64 = base64.replace(/\s/g, '');
+      base64 = base64Pad(base64);
+      base64 = base64.replace(/-/g, '+').replace(/_/g, '/');
+
+      let binary_string;
+      try {
+        binary_string = window.atob(base64);
+      } catch (error) {
+        console.error('Base64 decoding error:', error);
+        console.error('Problematic base64 string:', base64);
+        throw new Error('Invalid base64 string');
+      }
+
+      let len = binary_string.length;
+      let bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        bytes[i] = binary_string.charCodeAt(i);
+      }
+      return bytes;
+    }
+
+    function base64Pad(base64) {
+      let padded = base64;
+      while (padded.length % 4 !== 0) {
+        padded += '=';
+      }
+      return padded;
+    }
+
+    // Public Key (Replace with your actual public key)
+    const publicKeyPem = `-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEApfybvCnXYY/fTElELAZr
+reN0r54QlXPg4D4dWm9XdHWsWD0h9TSKrv+X8xWrTv8bkj9eZsPJqH2DoQDlyVl4
+LJgn+/DjcaM24t+RfHYq+wILl8kdKU1IGOPYmiiL72yQbryArwbO+euUjZDs44KK
+dGwt5GXHG3JbauNFjoYVbKHpcVSFwRt5KdIs/TFCBYhRHlKZAyF4oMtKQI7mMOmj
+ijIJM8BMn6HF60UUaJ9FL//SSIE9jeUGFdxU+ujXJLQppuRQrWlR/xk5Zs4pY/rZ
+Kiwc7VAj6WnAjerEjSiO1swk50YgxX6jSzjVrYA187/mKpCfRVdk9WUuY5zON/TE
+ZQIDAQAB
+-----END PUBLIC KEY-----`;
+
+    // Helper function to extract error messages from the server response
+    async function extractErrorMessage(response) {
+      let errorMessage = 'An error occurred';
+      try {
+        const data = await response.json();
+        if (data && data.error) {
+          errorMessage = data.error;
+        } else if (data && data.message) {
+          errorMessage = data.message;
+        } else {
+          errorMessage = response.statusText || 'An error occurred';
+        }
+      } catch (e) {
+        // If response is not JSON, try to get text
+        try {
+          const text = await response.text();
+          errorMessage = text || errorMessage;
+        } catch (err) {
+          // Fallback to default error message
+        }
+      }
+      return errorMessage;
+    }
+
+    // Event Listener for "註冊" (Register) Button
+    document.getElementById('registerButton').addEventListener('click', async (event) => {
+      event.preventDefault(); // Prevent form submission
+      const registerButton = document.getElementById('registerButton');
+      registerButton.disabled = true; // Disable the button to prevent multiple clicks
+
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      const twoFACode = document.getElementById('twoFACode').value;
+
+      registeredUsername = username;
+
+      try {
+        const publicKeyArrayBuffer = await pemToArrayBuffer(publicKeyPem);
+        const encryptedUsername = await encryptData(publicKeyArrayBuffer, username);
+        const encryptedPassword = await encryptData(publicKeyArrayBuffer, password);
+        // Remove encryption for twoFACode
+        // const encryptedTwoFACode = twoFACode ? await encryptData(publicKeyArrayBuffer, twoFACode) : null;
+
+        const requestBody = {
+          encryptedUsername,
+          encryptedPassword,
+        };
+
+        // Send twoFACode in plain text
+        if (twoFACode) {
+          requestBody.twoFACode = twoFACode; // Adjust the field name as needed
+        }
+
+        const response = await fetch(`${baseUrl}/login/register-fido`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(requestBody)
+        });
+
+        if (!response.ok) {
+          const errorMessage = await extractErrorMessage(response);
+          throw new Error(errorMessage);
+        }
+
+        registrationOptions = await response.json();
+        registrationOptions.challenge = base64ToUint8Array(registrationOptions.challenge);
+        registrationOptions.user.id = base64ToUint8Array(registrationOptions.user.id);
+        registrationOptions.authenticatorSelection = {
+          authenticatorAttachment: 'platform',
+          requireResidentKey: false,
+          userVerification: 'required'
+        };
+
+        // Save encrypted email to localStorage
+        const encodedEmail = base64Encode(username);
+        localStorage.setItem('encryptedEmail', encodedEmail);
+
+        // Proceed to verification step
+        document.getElementById('registration-step-2').classList.add('hidden');
+        document.getElementById('registration-step-3').classList.remove('hidden');
+
+      } catch (error) {
+        showNotification(`Registration failed: ${error.message}`);
+        showLog(`Registration error: ${error.message}`);
+        // Optionally, you can revert to the registration step 1 or step 2
+        document.getElementById('registration-step-2').classList.add('hidden');
+        document.getElementById('registration-step-1').classList.remove('hidden');
+      } finally {
+        registerButton.disabled = false; // Re-enable the button after API call is completed
+      }
+    });
+
+    // Event Listener for Verification Code Inputs
+    const verificationInputs = document.querySelectorAll('.verification-input');
+    verificationInputs.forEach((input, index) => {
+      input.addEventListener('input', (e) => {
+        const value = e.target.value;
+        // Allow only digits
+        if (/[^0-9]/.test(value)) {
+          e.target.value = '';
+          return;
+        }
+        // Move to next input if a digit is entered
+        if (value.length === 1 && index < verificationInputs.length - 1) {
+          verificationInputs[index + 1].focus();
+        }
+        // Check if all inputs are filled
+        const allFilled = Array.from(verificationInputs).every(input => input.value.length === 1);
+        if (allFilled) {
+          document.getElementById('verifyButton').disabled = false;
+          // Auto-trigger the verify button
+          document.getElementById('verifyButton').click();
+        }
+      });
+
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Backspace' && e.target.value === '' && index > 0) {
+          verificationInputs[index - 1].focus();
+        }
+      });
+    });
+
+    // Handle Paste Event
+    document.getElementById('verificationForm').addEventListener('paste', (e) => {
+      e.preventDefault();
+      const pasteData = e.clipboardData.getData('text').trim();
+      if (/^\d{6}$/.test(pasteData)) {
+        pasteData.split('').forEach((char, idx) => {
+          if (verificationInputs[idx]) {
+            verificationInputs[idx].value = char;
+          }
+        });
+        verificationInputs[verificationInputs.length - 1].focus();
+        // Enable the verify button
+        document.getElementById('verifyButton').disabled = false;
+        // Auto-trigger the verify button
+        document.getElementById('verifyButton').click();
+      }
+    });
+
+    // Event Listener for "驗證" (Verify) Button
+    document.getElementById('verifyButton').addEventListener('click', async (event) => {
+      event.preventDefault(); // Prevent form submission
+      const verifyButton = document.getElementById('verifyButton');
+      verifyButton.disabled = true; // Disable to prevent multiple submissions
+
+      const verificationCode = Array.from(verificationInputs).map(input => input.value).join('');
+
+      if (verificationCode.length !== 6) {
+        showNotification('請輸入完整的驗證碼。');
+        verifyButton.disabled = false;
+        return;
+      }
+
+      try {
+        const credential = await navigator.credentials.create({
+          publicKey: registrationOptions
+        });
+
+        const credentialResponse = {
+          id: credential.id,
+          rawId: arrayBufferToBase64(credential.rawId),
+          response: {
+            clientDataJSON: arrayBufferToBase64(credential.response.clientDataJSON),
+            attestationObject: arrayBufferToBase64(credential.response.attestationObject)
+          },
+          type: credential.type,
+          verificationCode: verificationCode,
+          email: registeredUsername
+        };
+
+        const responseSubmit = await fetch(`${baseUrl}/login/register-fido/verify-code-response`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(credentialResponse)
+        });
+
+        if (!responseSubmit.ok) {
+          const errorMessage = await extractErrorMessage(responseSubmit);
+          throw new Error(errorMessage);
+        }
+
+        showLog('Registration successful');
+        showNotification('Registration successful');
+
+        // Hide the keyboard by blurring the active element
+        document.activeElement.blur();
+
+        // Redirect to the authentication page after successful registration
+        window.location.href = `${baseUrl}/auth/`;
+      } catch (error) {
+        showLog('Error during verification: ' + error.message);
+        showNotification(`Verification failed: ${error.message}`);
+        verifyButton.disabled = false;
+      }
+    });
+
+    // Event Listener for "繼續" (Continue) Button
+    document.getElementById('continueButton').addEventListener('click', (event) => {
+      event.preventDefault(); // Prevent default button behavior if any
+      // Hide Step 1
+      document.getElementById('registration-step-1').classList.add('hidden');
+      // Show Step 2 (Registration Form)
+      document.getElementById('registration-step-2').classList.remove('hidden');
+    });
+
+    // Convert ArrayBuffer to Base64 (Used in Verification)
+    function arrayBufferToBase64(buffer) {
+      const binary = String.fromCharCode.apply(null, new Uint8Array(buffer));
+      return window.btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+    }
+
+    // Check for existing email in localStorage on page load
+    window.addEventListener('DOMContentLoaded', () => {
+      const storedEncodedEmail = localStorage.getItem('encryptedEmail');
+      if (storedEncodedEmail) {
+        const decodedEmail = base64Decode(storedEncodedEmail);
+        document.getElementById('username').value = decodedEmail;
+      }
+    });
+  </script>
+</body>
+
+</html>
